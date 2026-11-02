@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"shortener/internal/config"
 	"shortener/internal/handler"
 	"shortener/internal/storage"
 )
@@ -12,6 +13,7 @@ import (
 func main() {
 	store := storage.NewMemory()
 	h := handler.NewHandler(store)
+	cfg := config.Load()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
@@ -21,6 +23,7 @@ func main() {
 	mux.HandleFunc("GET /{code}", h.Redirect)
 	mux.HandleFunc("GET /stats/{code}", h.Stats)
 
-	log.Println("server on port :8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	log.Println("server on port :" + cfg.Port)
+	log.Fatal(http.ListenAndServe(":"+cfg.Port, mux))
+
 }
