@@ -5,12 +5,6 @@ import (
 	"time"
 )
 
-type Link struct {
-	Original  string
-	Clicks    int
-	CreatedAt time.Time
-}
-
 type Memory struct {
 	mu    sync.RWMutex
 	links map[string]*Link
@@ -22,27 +16,30 @@ func NewMemory() *Memory {
 	}
 }
 
-func (m *Memory) Save(code, url string) {
+func (m *Memory) Save(code, url string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.links[code] = &Link{Original: url, CreatedAt: time.Now()}
+	return nil
 }
 
-func (m *Memory) Get(code string) (Link, bool) {
+func (m *Memory) Get(code string) (Link, bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	l, ok := m.links[code]
 	if ok {
-		return *l, true
+		return *l, true, nil
 	}
-	return Link{}, false
+	return Link{}, false, nil
 }
 
-func (m *Memory) AddClick(code string) {
+func (m *Memory) AddClick(code string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	l, ok := m.links[code]
 	if ok {
 		l.Clicks++
+		return nil
 	}
+	return nil
 }

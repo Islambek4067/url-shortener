@@ -10,10 +10,10 @@ import (
 )
 
 type Handler struct {
-	store *storage.Memory
+	store storage.Storage
 }
 
-func NewHandler(store *storage.Memory) *Handler {
+func NewHandler(store storage.Storage) *Handler {
 	return &Handler{
 		store: store,
 	}
@@ -41,7 +41,10 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code := storage.GenerateCode(6)
-	h.store.Save(code, req.URL)
+	if err := h.store.Save(code, req.URL); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Contenet-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -52,15 +55,22 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
-	link, ok := h.store.Get(code)
-
-	if ok {
-		h.store.AddClick(code)
-		http.Redirect(w, r, link.Original, http.StatusFound)
-
-	} else {
-		http.Error(w, "Not found", http.StatusNotFound)
+	link, ok, err := h.store.Get(code)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
+	if !ok {
+
+		http.Error(w, "This link doesn't exist", http.StatusNotFound)
+		return
+	}
+
+	if err := h.store.AddClick(code); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, link.Original, http.StatusFound)
 }
 
 type statsResponse struct {
@@ -71,17 +81,22 @@ type statsResponse struct {
 
 func (h *Handler) Stats(w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
-	link, ok := h.store.Get(code)
+	link, ok, err := h.store.Get(code)
 
-	if ok {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(statsResponse{
-			Original:  link.Original,
-			Clicks:    link.Clicks,
-			CreatedAt: link.CreatedAt,
-		})
-	} else {
-		http.Error(w, "Not found", http.StatusNotFound)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
+	if !ok {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(statsResponse{
+		Original:  link.Original,
+		Clicks:    link.Clicks,
+		CreatedAt: link.CreatedAt,
+	})
 }

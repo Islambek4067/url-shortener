@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,12 +12,26 @@ import (
 )
 
 func main() {
-	store := storage.NewMemory()
-	h := handler.NewHandler(store)
+
 	cfg := config.Load()
+	var store storage.Storage
+
+	if cfg.DatabaseURL != "" {
+		pg, err := storage.NewPostgres(context.Background(), cfg.DatabaseURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		store = pg
+		log.Println("storage: PostgreSQL")
+	} else {
+		store = storage.NewMemory()
+		log.Println("storage: memory")
+	}
+
+	h := handler.NewHandler(store)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /default", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "default")
 	})
 	mux.HandleFunc("POST /shorten", h.Shorten)
